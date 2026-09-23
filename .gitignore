@@ -1,0 +1,35 @@
+# Local environment
+/.env
+/.env.local
+/.env.*.local
+
+# Frontend dependencies and build output
+/fe/node_modules/
+/fe/dist/
+/fe/coverage/
+
+# Backend runtime and test output
+/be/config.yaml
+/be/data/
+/be/bin/
+/be/coverage.out
+/be/logs/
+/be/eval/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating system and editor temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+AGENTS.md
+/.vscode/
+test/

@@ -1,0 +1,235 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #52525b;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+@keyframes message-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-enter {
+  animation: message-fade-in 0.3s ease-out;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+.toast-move {
+  transition: transform 0.2s ease;
+}
+
+/* 流式输出光标 */
+.stream-cursor::after {
+  content: '▍';
+  margin-left: 2px;
+  animation: cursor-blink 1s steps(2) infinite;
+  color: #3b82f6;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.md-body p {
+  margin: 0.4em 0;
+}
+.md-body p:first-child {
+  margin-top: 0;
+}
+.md-body p:last-child {
+  margin-bottom: 0;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0.85em 0 0.4em;
+}
+.md-body h1 {
+  font-size: 1.25rem;
+}
+.md-body h2 {
+  font-size: 1.1rem;
+}
+.md-body h3,
+.md-body h4 {
+  font-size: 1rem;
+}
+.md-body ul,
+.md-body ol {
+  margin: 0.4em 0;
+  padding-left: 1.4rem;
+}
+.md-body ul {
+  list-style: disc;
+}
+.md-body ol {
+  list-style: decimal;
+}
+.md-body blockquote {
+  margin: 0.5em 0;
+  border-left: 3px solid currentColor;
+  padding-left: 0.75rem;
+  opacity: 0.85;
+}
+.md-body code {
+  border-radius: 0.25rem;
+  background: #f3f4f6;
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+}
+.dark .md-body code {
+  background: #1f2937;
+}
+.md-body pre {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  border-radius: 0.6rem;
+  background: #111827;
+  padding: 0.75rem 1rem;
+  color: #f9fafb;
+}
+.md-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 0.8rem;
+}
+.md-body a {
+  color: #2563eb;
+  text-underline-offset: 2px;
+  text-decoration: underline;
+}
+.dark .md-body a {
+  color: #60a5fa;
+}
+.md-body hr {
+  margin: 1em 0;
+  border-color: #e5e7eb;
+}
+.dark .md-body hr {
+  border-color: #374151;
+}
+.md-body .katex-display {
+  max-width: 100%;
+  margin: 0.75em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15em 0;
+}
+.md-body table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.md-table-scroll {
+  max-width: 100%;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+}
+.md-body th,
+.md-body td {
+  border: 1px solid #e5e7eb;
+  padding: 0.4em 0.6em;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.md-body th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.dark .md-body th,
+.dark .md-body td {
+  border-color: #374151;
+}
+.dark .md-body th {
+  background: #1f2937;
+}
+.chunk-markdown {
+  min-width: 0;
+}
+.chunk-markdown .md-table-scroll {
+  color: inherit;
+}
+.md-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}

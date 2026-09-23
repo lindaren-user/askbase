@@ -1,0 +1,121 @@
+# AskBase 配置示例。
+# 首次运行前复制为 config.yaml，并替换所有需要的地址、凭证和模型参数。
+env: "dev" # dev / prod
+
+http:
+  host: "127.0.0.1"
+  port: 8082
+
+postgres:
+  host: "localhost"
+  port: 5434
+  user: "askbase"
+  password: "askbase_password"
+  database: "askbase"
+  sslMode: "disable"
+  maxOpenConns: 20
+  maxIdleConns: 5
+  connMaxLifetime: "30m"
+
+rabbitmq:
+  host: "localhost"
+  port: 5672
+  username: "askbase"
+  password: "askbase_password"
+  vhost: "/"
+
+# 文档解析使用持久化 Quorum Queue；通常无需修改拓扑名称。
+queue:
+  exchange: "askbase.documents"
+  name: "askbase.document.parse"
+  routingKey: "document.parse"
+  retryQueue: "askbase.document.parse.retry"
+  retryRoutingKey: "document.parse.retry"
+  deadExchange: "askbase.documents.dead"
+  deadQueue: "askbase.document.parse.dead"
+  deadRoutingKey: "document.parse.dead"
+  retryDelayMs: 60000
+  deadRetentionMs: 604800000
+  maxDeliveries: 5
+  concurrency: 1
+  prefetch: 1
+  confirmTimeoutMs: 5000
+
+outbox:
+  pollIntervalMs: 1000
+  maxBackoffMs: 60000
+  retentionHours: 168
+
+# OpenAI 兼容嵌入服务；dimension 必须与模型输出及数据库向量维度一致。
+embedding:
+  provider: "openai-compatible"
+  apiUrl: "https://api.example.com/v1"
+  apiKey: ""
+  model: "BAAI/bge-m3"
+  dimension: 1024
+  batchSize: 32
+
+# OpenAI 兼容视觉模型。仅图片或扫描文档解析需要。
+vision:
+  apiUrl: "https://api.example.com/v1"
+  apiKey: ""
+  model: ""
+
+# MinerU 为可选的复杂 PDF 解析服务；关闭时不需要填写 token。
+mineru:
+  enabled: false
+  apiUrl: "https://mineru.net"
+  token: ""
+  modelVersion: "vlm"
+  language: "ch"
+  ocr: true
+  enableFormula: true
+  enableTable: true
+  pollIntervalMs: 3000
+  timeoutSeconds: 900
+
+# OpenAI 兼容对话模型。
+llm:
+  apiUrl: "https://api.example.com/v1"
+  apiKey: ""
+  model: ""
+  contextWindowTokens: 32768
+
+chat:
+  router:
+    maxTokens: 512
+    maxSubqueries: 4
+  retrieval:
+    topK: 10
+    minScore: 0.20
+
+auth:
+  secret: "change-me-before-production"
+  cookieName: "askbase_session"
+  # 仅在 env=dev 时生效；可修改或置空。env=prod 时程序会强制禁用。
+  devCode: "123456"
+  turnstile:
+    siteKey: ""
+    secretKey: ""
+
+storage:
+  s3:
+    endpoint: ""
+    region: "auto"
+    bucket: "askbase"
+    accessKey: ""
+    secretKey: ""
+    publicBaseUrl: ""
+    prefix: "askbase"
+
+# 本地开发使用 echo：不发送邮件，验证码只写入后端日志。
+mail:
+  provider: "echo" # echo / smtp / resend
+  smtp:
+    host: ""
+    port: 465
+    username: ""
+    password: ""
+  resend:
+    api_key: ""
+    from: ""

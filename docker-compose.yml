@@ -1,0 +1,121 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: ./fe/Dockerfile
+    image: askbase-frontend:local
+    container_name: askbase-frontend
+    depends_on:
+      - backend-api
+    ports:
+      - "127.0.0.1:8080:80"
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: askbase-postgres
+    environment:
+      POSTGRES_DB: askbase
+      POSTGRES_USER: askbase
+      POSTGRES_PASSWORD: askbase_password
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - ./be/data/postgres_data:/var/lib/postgresql/data
+      - ./be/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U askbase -d askbase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: askbase-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: askbase
+      RABBITMQ_DEFAULT_PASS: askbase_password
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - ./be/data/rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # HTTP API 仅写 PostgreSQL Outbox，不直接依赖 RabbitMQ。
+  backend-api:
+    build:
+      context: .
+      dockerfile: ./be/Dockerfile
+    image: askbase-backend:local
+    container_name: askbase-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONFIG_FILE: /app/config.yaml
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    ports:
+      - "127.0.0.1:8082:8082"
+    volumes:
+      - ./be/config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+
+  # 文档解析消费者；默认单 Pod 并发 1。
+  backend-worker:
+    build:
+      context: .
+      dockerfile: ./be/Dockerfile
+    image: askbase-backend:local
+    container_name: askbase-worker
+    command: ["/app/askbase-worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      CONFIG_FILE: /app/config.yaml
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: askbase
+      RABBITMQ_PASSWORD: askbase_password
+      RABBITMQ_VHOST: /
+    volumes:
+      - ./be/config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+
+  # 事务 Outbox relay；与 API、worker 独立重启和扩缩容。
+  backend-relay:
+    build:
+      context: .
+      dockerfile: ./be/Dockerfile
+    image: askbase-backend:local
+    container_name: askbase-relay
+    command: ["/app/askbase-relay"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      CONFIG_FILE: /app/config.yaml
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: askbase
+      RABBITMQ_PASSWORD: askbase_password
+      RABBITMQ_VHOST: /
+    volumes:
+      - ./be/config.yaml:/app/config.yaml:ro
+    restart: unless-stopped

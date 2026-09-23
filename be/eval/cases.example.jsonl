@@ -1,0 +1,5 @@
+{"id":"greeting","datasetId":0,"history":[],"question":"你好","expectedRoute":"none","relevantEvidence":[]}
+{"id":"direct-example","datasetId":1,"history":[],"question":"项目 Alpha 什么时候上线？","expectedRoute":"direct","relevantEvidence":[{"documentName":"项目Alpha说明书.pdf","contains":["2024年6月","正式上线"]}]}
+{"id":"rewrite-example","datasetId":1,"history":[{"role":"user","content":"介绍一下项目 Alpha"},{"role":"assistant","content":"项目 Alpha 是内部知识库项目。"}],"question":"它什么时候上线？","expectedRoute":"contextual_rewrite","relevantEvidence":[{"documentName":"项目Alpha说明书.pdf","contains":["2024年6月","正式上线"]}]}
+{"id":"decomposition-example","datasetId":1,"history":[],"question":"项目 Alpha 的上线时间和部署环境分别是什么？","expectedRoute":"decomposition","relevantEvidence":[{"documentName":"项目Alpha说明书.pdf","contains":["2024年6月","正式上线"]},{"documentName":"项目Alpha部署手册.pdf","contains":["生产环境","部署"]}]}
+{"id":"missing-answer-example","datasetId":1,"history":[],"question":"项目 Alpha 的火星节点编号是什么？","expectedRoute":"direct","relevantEvidence":[],"expectNoEvidence":true}

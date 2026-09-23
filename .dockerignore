@@ -1,0 +1,8 @@
+.git
+**/node_modules
+fe/dist
+be/data
+be/logs
+be/testdata
+*.md
+!README.md
