@@ -69,6 +69,9 @@ type AuthService struct {
 // NewAuthService 创建认证服务。验证码写入 Ristretto，1 分钟过期。
 // datasets 用于注销账号时级联清理知识库及对象存储。
 func NewAuthService(db *gorm.DB, users userStore, datasets accountDatasetStore, embedModels accountModelDeleter, visionModels accountModelDeleter, authConfig config.AuthConfig, env string, mailSender mail.Sender) (*AuthService, error) {
+	if strings.TrimSpace(authConfig.Secret) == "" {
+		return nil, fmt.Errorf("认证密钥不能为空")
+	}
 	codes, err := ristretto.NewCache(&ristretto.Config[string, string]{
 		NumCounters: 1e4,
 		MaxCost:     1e4,

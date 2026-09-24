@@ -4,27 +4,25 @@ services:
       context: .
       dockerfile: ./fe/Dockerfile
     image: askbase-frontend:local
-    container_name: askbase-frontend
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_healthy
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
 
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: askbase-postgres
     environment:
-      POSTGRES_DB: askbase
-      POSTGRES_USER: askbase
-      POSTGRES_PASSWORD: askbase_password
+      POSTGRES_DB: ${POSTGRES_DB:-askbase}
+      POSTGRES_USER: ${POSTGRES_USER:-askbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-askbase_password}
     ports:
       - "127.0.0.1:5434:5432"
     volumes:
       - ./be/data/postgres_data:/var/lib/postgresql/data
-      - ./be/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U askbase -d askbase"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,10 +30,9 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
-    container_name: askbase-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: askbase
-      RABBITMQ_DEFAULT_PASS: askbase_password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-askbase}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-askbase_password}
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -48,24 +45,65 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # 独立迁移任务；成功退出后其余后端进程才会启动。
+  backend-migrate:
+    build:
+      context: .
+      dockerfile: ./be/Dockerfile
+    image: askbase-backend:local
+    command: ["/app/askbase-migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONFIG_FILE: /app/config.yaml
+      APP_ENV: ${APP_ENV:-dev}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-askbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-askbase_password}
+      POSTGRES_DB: ${POSTGRES_DB:-askbase}
+    volumes:
+      - ./be/config.yaml:/app/config.yaml:ro
+    restart: "no"
+
   # HTTP API 仅写 PostgreSQL Outbox，不直接依赖 RabbitMQ。
   backend-api:
     build:
       context: .
       dockerfile: ./be/Dockerfile
     image: askbase-backend:local
-    container_name: askbase-api
     depends_on:
-      postgres:
-        condition: service_healthy
+      backend-migrate:
+        condition: service_completed_successfully
     environment:
       CONFIG_FILE: /app/config.yaml
+      APP_ENV: ${APP_ENV:-dev}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-askbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-askbase_password}
+      POSTGRES_DB: ${POSTGRES_DB:-askbase}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      VISION_API_KEY: ${VISION_API_KEY:-}
+      MINERU_TOKEN: ${MINERU_TOKEN:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     ports:
       - "127.0.0.1:8082:8082"
     volumes:
       - ./be/config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8082/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # 文档解析消费者；默认单 Pod 并发 1。
@@ -74,22 +112,31 @@ services:
       context: .
       dockerfile: ./be/Dockerfile
     image: askbase-backend:local
-    container_name: askbase-worker
     command: ["/app/askbase-worker"]
     depends_on:
-      postgres:
-        condition: service_healthy
+      backend-migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
       CONFIG_FILE: /app/config.yaml
+      APP_ENV: ${APP_ENV:-dev}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-askbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-askbase_password}
+      POSTGRES_DB: ${POSTGRES_DB:-askbase}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
-      RABBITMQ_USERNAME: askbase
-      RABBITMQ_PASSWORD: askbase_password
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-askbase}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-askbase_password}
       RABBITMQ_VHOST: /
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      VISION_API_KEY: ${VISION_API_KEY:-}
+      MINERU_TOKEN: ${MINERU_TOKEN:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     volumes:
       - ./be/config.yaml:/app/config.yaml:ro
     restart: unless-stopped
@@ -100,21 +147,24 @@ services:
       context: .
       dockerfile: ./be/Dockerfile
     image: askbase-backend:local
-    container_name: askbase-relay
     command: ["/app/askbase-relay"]
     depends_on:
-      postgres:
-        condition: service_healthy
+      backend-migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
       CONFIG_FILE: /app/config.yaml
+      APP_ENV: ${APP_ENV:-dev}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-askbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-askbase_password}
+      POSTGRES_DB: ${POSTGRES_DB:-askbase}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
-      RABBITMQ_USERNAME: askbase
-      RABBITMQ_PASSWORD: askbase_password
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-askbase}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-askbase_password}
       RABBITMQ_VHOST: /
     volumes:
       - ./be/config.yaml:/app/config.yaml:ro
