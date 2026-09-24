@@ -52,6 +52,16 @@ function loadScript(): Promise<void> {
   })
 }
 
+// reset 丢弃已经提交过的单次令牌，并让 Turnstile 生成新的验证结果。
+function reset() {
+  if (widgetId.value && window.turnstile) {
+    window.turnstile.reset(widgetId.value)
+  }
+  emit('expired')
+}
+
+defineExpose({ reset })
+
 async function mountWidget() {
   if (!props.sitekey || !container.value) return
   try {

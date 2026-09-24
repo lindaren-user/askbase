@@ -18,7 +18,9 @@ const email = ref('')
 const code = ref('')
 const turnstileToken = ref('')
 const turnstileConfig = ref<TurnstileConfig | null>(null)
+const turnstileWidget = ref<{ reset: () => void } | null>(null)
 const loading = ref(false)
+const sendingCode = ref(false)
 const codeCountdown = ref(0)
 let countdownTimer: ReturnType<typeof setTimeout> | null = null
 const toast = useToast()
@@ -40,6 +42,7 @@ async function loadTurnstileConfig() {
 watch(
   () => props.open,
   (open) => {
+    turnstileToken.value = ''
     if (!open) return
     void loadTurnstileConfig()
   },
@@ -78,17 +81,25 @@ function requireValidEmail(): boolean {
 
 async function handleSendCode() {
   if (!requireValidEmail()) return
+  if (sendingCode.value || codeCountdown.value > 0) return
   if (turnstileEnabled.value && !turnstileToken.value) {
     toast.error('请先完成人机验证')
     return
   }
-  if (codeCountdown.value > 0) return
+  sendingCode.value = true
   try {
     await sendAuthCode(email.value.trim(), turnstileToken.value)
     startCountdown()
     toast.success('验证码已发送')
   } catch (error) {
     toast.fromError(error, '发送验证码失败')
+  } finally {
+    sendingCode.value = false
+    if (turnstileEnabled.value) {
+      // Turnstile 令牌只能校验一次；请求结束后必须重置，避免重发时复用旧令牌。
+      turnstileToken.value = ''
+      turnstileWidget.value?.reset()
+    }
   }
 }
 
@@ -173,20 +184,21 @@ function handleKeydown(e: KeyboardEvent) {
                     type="button"
                     class="shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
                     :class="
-                      codeCountdown > 0
+                      codeCountdown > 0 || sendingCode
                         ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
                         : 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
                     "
-                    :disabled="codeCountdown > 0"
+                    :disabled="codeCountdown > 0 || sendingCode"
                     @click="handleSendCode"
                   >
-                    {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
+                    {{ sendingCode ? '发送中...' : codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
                   </button>
                 </div>
               </div>
 
               <TurnstileWidget
                 v-if="turnstileEnabled"
+                ref="turnstileWidget"
                 :sitekey="turnstileConfig!.siteKey"
                 action="login"
                 @verified="turnstileToken = $event"
