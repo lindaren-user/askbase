@@ -93,7 +93,6 @@ type OutboxConfig struct {
 // LogConfig 日志配置，由 env 推导，不落在 yaml。
 type LogConfig struct {
 	Development bool
-	File        string
 }
 
 type AuthConfig struct {
@@ -452,7 +451,7 @@ func (c *Config) applyDefaults() {
 	if c.Outbox.RetentionHours <= 0 {
 		c.Outbox.RetentionHours = 24 * 7
 	}
-	if c.Auth.Secret == "" {
+	if c.Auth.Secret == "" && c.Env == EnvDev {
 		c.Auth.Secret = "dev-auth-secret"
 	}
 	if c.Auth.CookieName == "" {
@@ -518,13 +517,7 @@ func (c *Config) applyDefaults() {
 }
 
 func logConfigFromEnv(env string) LogConfig {
-	if env == EnvProd {
-		return LogConfig{
-			Development: false,
-			File:        "logs/app.log",
-		}
-	}
-	return LogConfig{Development: true}
+	return LogConfig{Development: env != EnvProd}
 }
 
 // ListenAddr 返回 HTTP 监听地址。

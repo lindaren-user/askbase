@@ -2,7 +2,6 @@ package logging
 
 import (
 	"os"
-	"path/filepath"
 
 	"askbase/be/internal/config"
 
@@ -10,34 +9,23 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Init 初始化 zap 全局日志：开发用 console 编码写 stdout，生产用 JSON 追加写文件。
+// Init 初始化 zap 全局日志：开发使用 console 编码，生产使用 JSON，统一写入 stdout。
 func Init(cfg config.LogConfig) error {
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	var core zapcore.Core
+	var encoder zapcore.Encoder
 	if cfg.Development {
 		encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		core = zapcore.NewCore(
-			zapcore.NewConsoleEncoder(encoderCfg),
-			zapcore.Lock(os.Stdout),
-			zapcore.DebugLevel,
-		)
+		encoder = zapcore.NewConsoleEncoder(encoderCfg)
 	} else {
-		if err := ensureLogDir(cfg.File); err != nil {
-			return err
-		}
-		f, err := os.OpenFile(cfg.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		if err != nil {
-			return err
-		}
-		core = zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderCfg),
-			zapcore.Lock(f),
-			zapcore.InfoLevel,
-		)
+		encoder = zapcore.NewJSONEncoder(encoderCfg)
 	}
-
+	level := zapcore.InfoLevel
+	if cfg.Development {
+		level = zapcore.DebugLevel
+	}
+	core := zapcore.NewCore(encoder, zapcore.Lock(os.Stdout), level)
 	zap.ReplaceGlobals(zap.New(core, zap.AddCaller()))
 	return nil
 }
@@ -45,12 +33,4 @@ func Init(cfg config.LogConfig) error {
 // L 返回全局 logger 的简写。
 func L() *zap.Logger {
 	return zap.L()
-}
-
-func ensureLogDir(file string) error {
-	dir := filepath.Dir(file)
-	if dir == "." || dir == "" {
-		return nil
-	}
-	return os.MkdirAll(dir, 0o755)
 }

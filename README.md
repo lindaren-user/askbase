@@ -133,6 +133,8 @@ flowchart LR
 - `askbase-worker`：消费文档解析任务，默认并发数和 prefetch 均为 1。
 - `askbase-relay`：将 PostgreSQL Outbox 中的待发布事件可靠投递到 RabbitMQ。
 
+同一镜像还包含一次性任务 `askbase-migrate`，负责在这些长期运行进程启动前应用数据库迁移。
+
 这一进程边界可直接对应 K8s 中的三个 Deployment；仓库当前暂未提供 K8s manifests。
 
 ## 快速开始
@@ -176,7 +178,7 @@ Copy-Item be/config.example.yaml be/config.yaml
 
 配置加载优先级为：**环境变量 > `config.yaml` > 程序默认值**。本地直接使用 YAML；Docker 或 K8s 部署时可将 `config.yaml` 作为只读配置挂载，并通过 Secret 对应的环境变量覆盖密码和 API Key。
 
-不要把真实 API Key、对象存储密钥或生产密码写入 `config.example.yaml`。`env: "prod"` 时 `auth.devCode` 即使有值也不会生效。
+不要把真实 API Key、对象存储密钥或生产密码写入 `config.example.yaml`。`env: "prod"` 时 `auth.devCode` 即使有值也不会生效，并且 `auth.secret` 为空会拒绝启动。
 
 ### 3. 启动完整服务
 
@@ -187,6 +189,7 @@ docker compose up --build -d
 Compose 会启动以下服务：
 
 - `frontend`：Nginx 托管前端资源，并将 `/api` 反向代理到 API
+- `backend-migrate`：按版本执行待应用的数据库迁移，成功后退出
 - `backend-api`：HTTP API
 - `backend-worker`：文档解析消费者
 - `backend-relay`：Outbox 事件发布器
@@ -199,6 +202,8 @@ Compose 会启动以下服务：
 - RabbitMQ 管理界面：<http://localhost:15672>
 
 示例配置处于开发环境，可使用任意邮箱和验证码 `123456` 登录；该验证码由 `auth.devCode` 配置，可以修改或置空。
+
+Compose 中 PostgreSQL 与 RabbitMQ 的开发密码可以通过当前 shell 的 `POSTGRES_PASSWORD`、`RABBITMQ_USERNAME` 和 `RABBITMQ_PASSWORD` 覆盖，不要求创建 `.env` 文件。公网部署时应通过部署平台 Secret 注入，并设置 `APP_ENV=prod` 与高强度 `AUTH_SECRET`。
 
 查看日志或停止服务：
 
@@ -219,7 +224,14 @@ docker compose up -d postgres rabbitmq
 
 ### 2. 启动后端
 
-分别在三个终端运行：
+先执行数据库迁移：
+
+```bash
+cd be
+go run ./cmd/migrate
+```
+
+然后分别在三个终端运行：
 
 ```bash
 cd be
@@ -301,13 +313,15 @@ AskBase/
 ├── docker-compose.yml       # 完整本地容器编排
 ├── be/
 │   ├── cmd/
+│   │   ├── migrate/         # 数据库迁移任务
 │   │   ├── server/          # HTTP API
 │   │   ├── worker/          # 文档解析消费者
 │   │   ├── relay/           # Outbox relay
 │   │   └── rageval/         # 离线检索评测
 │   ├── config.example.yaml  # 可提交的脱敏配置模板
-│   ├── migrations/000001_init.up.sql  # 开发期全量数据库结构基线
+│   ├── migrations/          # 编译进迁移任务的版本化 SQL
 │   ├── internal/
+│   │   ├── migration/       # 迁移发现、排序与事务执行
 │   │   ├── handler/         # HTTP 适配层
 │   │   ├── service/         # 业务逻辑与 RAG 编排
 │   │   ├── repo/            # 数据访问
@@ -318,7 +332,7 @@ AskBase/
 │   │   │   └── chunker/     # 分块、token 估算与稳定 ID
 │   │   ├── llm/             # OpenAI 兼容模型客户端
 │   │   └── storage/         # S3 兼容对象存储
-│   └── Dockerfile           # 构建三个后端二进制到同一镜像
+│   └── Dockerfile           # 构建四个后端二进制到同一镜像
 └── fe/                      # Vue 3 + Vite + Tailwind CSS
     ├── Dockerfile           # 构建前端并由 Nginx 提供服务
     └── nginx.conf           # 静态资源、SPA 回退与 API/SSE 代理
@@ -329,7 +343,7 @@ AskBase/
 - 尚未接入 Rerank 模型，当前排序结果来自向量/全文召回与 RRF 融合。
 - 尚未提供 K8s manifests、DLQ 管理页面和人工重放 API。
 - 邮箱验证码缓存在 API 进程内；多 API Pod 部署前需要改为共享存储。
-- 数据库仍处于开发期，`be/migrations/000001_init.up.sql` 是全量初始化脚本，不承诺旧数据结构的平滑迁移。
+- 数据库迁移只支持向前执行 `.up.sql`，暂不提供自动回滚。
 
 ## 开发与验证
 

@@ -12,11 +12,11 @@ COPY fe/ ./
 RUN pnpm build
 
 # ---- 静态资源服务 ----
-FROM nginx:1.28-alpine
+FROM nginxinc/nginx-unprivileged:1.28-alpine
 COPY fe/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/fe/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/healthz || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
