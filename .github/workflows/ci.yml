@@ -67,3 +67,16 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  containers:
+    name: Containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate Compose
+        run: docker compose config --quiet
+
+      - name: Build images
+        run: docker compose build backend-api frontend
