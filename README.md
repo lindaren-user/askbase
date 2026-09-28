@@ -268,7 +268,7 @@ Windows 本地运行涉及 PDF 页面渲染时，请先阅读 [`be/scripts/READM
 
 ### 2. 文档解析与可靠队列
 
-文档记录和 Outbox 事件在同一个 PostgreSQL 事务中提交。Relay 使用 `FOR UPDATE SKIP LOCKED` 并发获取事件，消息收到 RabbitMQ publisher confirm 后才标记为已发布。Worker 使用 manual ACK；临时失败进入延迟重试队列，永久失败或重试耗尽后写入文档失败状态并进入 DLQ。
+文档记录和 Outbox 事件在同一个 PostgreSQL 事务中提交。Relay 使用 `FOR UPDATE SKIP LOCKED` 在短事务中领取事件，提交后再发布到 RabbitMQ；发布结果按租约令牌写回，过期租约可重新领取。消息收到 RabbitMQ publisher confirm 后才标记为已发布。新增的租约字段由 `backend-migrate` 自动迁移，本地开发可运行 `go run ./cmd/migrate`。Worker 使用 manual ACK；临时失败进入延迟重试队列，永久失败或重试耗尽后写入文档失败状态并进入 DLQ。
 
 `parse_version` 用于淘汰手动重试前的旧消息，PostgreSQL advisory lock 用于避免多个 Worker 同时处理同一文档。锁当前会占用一个数据库连接，代码中已保留后续迁移至 Redis 分布式锁的 TODO。
 

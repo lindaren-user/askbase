@@ -43,6 +43,7 @@ queue:
 
 outbox:
   pollIntervalMs: 1000
+  leaseDurationMs: 30000
   maxBackoffMs: 60000
   retentionHours: 168
 

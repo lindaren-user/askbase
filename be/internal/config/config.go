@@ -85,9 +85,10 @@ type QueueConfig struct {
 
 // OutboxConfig relay 轮询、退避与清理配置。
 type OutboxConfig struct {
-	PollIntervalMs int64 `mapstructure:"pollIntervalMs"`
-	MaxBackoffMs   int64 `mapstructure:"maxBackoffMs"`
-	RetentionHours int   `mapstructure:"retentionHours"`
+	PollIntervalMs  int64 `mapstructure:"pollIntervalMs"`
+	LeaseDurationMs int64 `mapstructure:"leaseDurationMs"`
+	MaxBackoffMs    int64 `mapstructure:"maxBackoffMs"`
+	RetentionHours  int   `mapstructure:"retentionHours"`
 }
 
 // LogConfig 日志配置，由 env 推导，不落在 yaml。
@@ -295,6 +296,7 @@ func bindEnvs(v *viper.Viper) {
 	_ = v.BindEnv("queue.retryDelayMs", "QUEUE_RETRY_DELAY_MS")
 	_ = v.BindEnv("queue.maxDeliveries", "QUEUE_MAX_DELIVERIES")
 	_ = v.BindEnv("outbox.pollIntervalMs", "OUTBOX_POLL_INTERVAL_MS")
+	_ = v.BindEnv("outbox.leaseDurationMs", "OUTBOX_LEASE_DURATION_MS")
 	_ = v.BindEnv("auth.secret", "AUTH_SECRET")
 	_ = v.BindEnv("auth.cookieName", "AUTH_COOKIE_NAME")
 	_ = v.BindEnv("auth.devCode", "AUTH_DEV_CODE")
@@ -445,6 +447,9 @@ func (c *Config) applyDefaults() {
 	if c.Outbox.PollIntervalMs <= 0 {
 		c.Outbox.PollIntervalMs = 1000
 	}
+	if c.Outbox.LeaseDurationMs <= 0 {
+		c.Outbox.LeaseDurationMs = 30000
+	}
 	if c.Outbox.MaxBackoffMs <= 0 {
 		c.Outbox.MaxBackoffMs = 60000
 	}
@@ -538,6 +543,11 @@ func (c OutboxConfig) PollInterval() time.Duration {
 // MaxBackoff 返回 Outbox 发布失败的最大退避时间。
 func (c OutboxConfig) MaxBackoff() time.Duration {
 	return time.Duration(c.MaxBackoffMs) * time.Millisecond
+}
+
+// LeaseDuration 返回 Outbox 事件的领取租约时长。
+func (c OutboxConfig) LeaseDuration() time.Duration {
+	return time.Duration(c.LeaseDurationMs) * time.Millisecond
 }
 
 // Retention 返回已发布 Outbox 的保留时间。
