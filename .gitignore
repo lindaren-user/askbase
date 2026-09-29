@@ -15,6 +15,14 @@
 /be/coverage.out
 /be/logs/
 /be/eval/
+/eval/data/
+/eval/results/
+/eval/.venv/
+/.pydeps/
+/.hf-cache/
+/.gocache/
+__pycache__/
+*.pyc
 
 # Logs
 *.log

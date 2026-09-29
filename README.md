@@ -27,7 +27,7 @@ AskBase 使用 Go、PostgreSQL + pgvector 和 RabbitMQ 构建完整的文档处�
 - **可验证回答**：SSE 流式生成答案，正文内联 `[n]` 引用，可回看命中的文档与原始分块。
 - **可靠异步处理**：Transactional Outbox、RabbitMQ Quorum Queue、延迟重试和 DLQ 共同保证文档任务至少投递一次。
 - **可观察的处理过程**：展示文档解析状态与进度，支持失败重试、停止任务以及文档或分块级检索开关。
-- **检索评测工具**：内置检索测试台和离线黄金集评测器，可检查查询路由、召回结果与稳定性。
+- **检索评测工具**：内置检索测试台，并可基于带公开标注的中文数据集评测召回与排序。
 
 ## 产品界面
 
@@ -295,16 +295,9 @@ RRF(d) = Σ 1 / (60 + rank_i(d))
 
 检索分块以编号上下文注入提示词，模型在答案中使用 `[n]` 标注依据；引用的分块 ID 持久化到消息记录，刷新页面后仍可查看原文。当前上下文使用固定数量的历史消息，后续将改为基于 token 水位线的滑动窗口，并压缩窗口外历史。
 
-## 离线检索评测
+## 公开检索评测
 
-评测器复用在线对话的查询规划与检索链路，可基于私有 JSONL 黄金集检查路由分类、证据召回和多次运行稳定性。
-
-```bash
-cd be
-go run ./cmd/rageval --cases ./eval/cases.jsonl --output ./eval/results
-```
-
-数据格式与指标说明见 [`be/eval/README.md`](./be/eval/README.md)。评测结果可能包含私人文档片段，请勿直接提交或分享。
+评测器下载带原始相关性标注的中文 T2Retrieval 数据集，将公开语料索引到专用知识库，复用线上检索服务采集排名，再计算 Recall、首条相关结果排名和 nDCG。Python 负责公开数据与标准指标，Go 负责实际索引和检索。当前仅评估纯文本 passage 的通用切分与原始文档级相关性；其他分块策略及块级证据评测列为 TODO。运行方式、数据规模与指标定义见 [`eval/README.md`](./eval/README.md)。私有知识库黄金集留待后续建设。
 
 ## 项目结构
 
@@ -317,7 +310,7 @@ AskBase/
 │   │   ├── server/          # HTTP API
 │   │   ├── worker/          # 文档解析消费者
 │   │   ├── relay/           # Outbox relay
-│   │   └── rageval/         # 离线检索评测
+│   │   └── retrievaldump/   # 公开语料索引与检索结果采集
 │   ├── config.example.yaml  # 可提交的脱敏配置模板
 │   ├── migrations/          # 编译进迁移任务的版本化 SQL
 │   ├── internal/
@@ -333,6 +326,7 @@ AskBase/
 │   │   ├── llm/             # OpenAI 兼容模型客户端
 │   │   └── storage/         # S3 兼容对象存储
 │   └── Dockerfile           # 构建四个后端二进制到同一镜像
+├── eval/                    # Python 公开检索基准、指标与报告
 └── fe/                      # Vue 3 + Vite + Tailwind CSS
     ├── Dockerfile           # 构建前端并由 Nginx 提供服务
     └── nginx.conf           # 静态资源、SPA 回退与 API/SSE 代理
