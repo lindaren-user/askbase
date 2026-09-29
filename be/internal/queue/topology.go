@@ -17,6 +17,7 @@ func DeclareTopology(ch *amqp.Channel, cfg config.QueueConfig) error {
 		return fmt.Errorf("声明死信交换机失败: %w", err)
 	}
 
+	// TODO: 部署多节点 RabbitMQ 集群，以发挥 quorum 队列的副本容错能力；当前 Compose 仅运行单节点。
 	mainArgs := amqp.Table{
 		"x-queue-type":              "quorum",  // 多节点复制，提高消息持久性与可用性。
 		"x-delivery-limit":          int64(-1), // 关闭 Broker 次数限制，由应用控制重试次数。
@@ -43,6 +44,8 @@ func DeclareTopology(ch *amqp.Channel, cfg config.QueueConfig) error {
 		return fmt.Errorf("绑定重试队列失败: %w", err)
 	}
 
+	// TODO: 为 DLQ 增加告警通知，通知人工介入排查和处理死信消息。
+	// DLQ 暂存永久失败、重试耗尽或消息格式损坏的消息，保留期由 DeadRetentionMs 控制。
 	deadArgs := amqp.Table{
 		"x-queue-type":  "quorum",
 		"x-message-ttl": cfg.DeadRetentionMs, // DLQ 消息超过保留期后自动清理。

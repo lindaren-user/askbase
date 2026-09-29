@@ -11,6 +11,8 @@ const (
 
 	// OutboxStatusPending 表示事件尚未成功发布。
 	OutboxStatusPending = "pending"
+	// OutboxStatusProcessing 表示事件已被 relay 领取，等待发布结果。
+	OutboxStatusProcessing = "processing"
 	// OutboxStatusPublished 表示事件已收到 RabbitMQ publisher confirm。
 	OutboxStatusPublished = "published"
 )
@@ -24,6 +26,8 @@ type Outbox struct {
 	Status          string          `gorm:"size:16;not null"`
 	PublishAttempts int             `gorm:"not null"`
 	NextAttemptAt   time.Time       `gorm:"not null"`
+	LeaseToken      *string
+	LeaseUntil      *time.Time
 	PublishedAt     *time.Time
 	LastError       *string
 	CreatedAt       time.Time

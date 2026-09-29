@@ -43,6 +43,8 @@ func RetryWithoutPenalty(err error) error {
 	return classifiedError{err: err, penalty: false}
 }
 
+// classify 从错误链中读取处理策略：permanent 表示直接终止，penalty 表示重试计入尝试次数。
+// 未标记的错误默认可重试且计入尝试次数。
 func classify(err error) (permanent bool, penalty bool) {
 	penalty = true
 	var classified classifiedError

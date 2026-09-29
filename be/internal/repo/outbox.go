@@ -30,46 +30,44 @@ func (r *OutboxRepository) Create(ctx context.Context, event model.Outbox) (mode
 	return event, nil
 }
 
-// LockNextByStatus 锁定一条指定状态且已到期的事件；调用方负责开启事务。
-func (r *OutboxRepository) LockNextByStatus(ctx context.Context, status string, dueAt time.Time) (model.Outbox, bool, error) {
+// LockNextDue 在当前事务中锁定一条符合调用方状态和时间条件的记录。
+func (r *OutboxRepository) LockNextDue(
+	ctx context.Context,
+	scheduledStatus string,
+	scheduledBefore time.Time,
+	leasedStatus string,
+	leaseBefore time.Time,
+) (model.Outbox, bool, error) {
 	var event model.Outbox
+	// 对应 SQL：
+	// SELECT * FROM t_outbox
+	// WHERE (status = ? AND next_attempt_at <= ?) OR (status = ? AND lease_until <= ?)
+	// ORDER BY id ASC LIMIT 1 FOR UPDATE SKIP LOCKED;
 	err := conn(ctx, r.db).Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("status = ? AND next_attempt_at <= ?", status, dueAt).
+		Where("(status = ? AND next_attempt_at <= ?) OR (status = ? AND lease_until <= ?)",
+			scheduledStatus, scheduledBefore, leasedStatus, leaseBefore).
 		Order("id ASC").
 		Take(&event).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.Outbox{}, false, nil
 	}
 	if err != nil {
-		return model.Outbox{}, false, fmt.Errorf("锁定 Outbox 事件失败: %w", err)
+		return model.Outbox{}, false, fmt.Errorf("锁定 Outbox 记录失败: %w", err)
 	}
 	return event, true, nil
 }
 
-// UpdatePublishFailure 持久化调用方计算好的发布失败结果。
-func (r *OutboxRepository) UpdatePublishFailure(ctx context.Context, id int64, attempts int, nextAttemptAt time.Time, lastError string, updatedAt time.Time) error {
-	if err := conn(ctx, r.db).Model(&model.Outbox{}).Where("id = ?", id).Updates(map[string]any{
-		"publish_attempts": attempts,
-		"next_attempt_at":  nextAttemptAt,
-		"last_error":       lastError,
-		"updated_at":       updatedAt,
-	}).Error; err != nil {
-		return fmt.Errorf("更新 Outbox 发布失败结果: %w", err)
+// UpdateFields 按调用方指定的等值条件原子更新列，返回是否匹配到记录。
+func (r *OutboxRepository) UpdateFields(ctx context.Context, id int64, conditions map[string]any, fields map[string]any) (bool, error) {
+	query := conn(ctx, r.db).Model(&model.Outbox{}).Where("id = ?", id)
+	if len(conditions) > 0 {
+		query = query.Where(conditions)
 	}
-	return nil
-}
-
-// UpdatePublished 持久化调用方给出的发布成功状态与时间。
-func (r *OutboxRepository) UpdatePublished(ctx context.Context, id int64, status string, publishedAt time.Time) error {
-	if err := conn(ctx, r.db).Model(&model.Outbox{}).Where("id = ?", id).Updates(map[string]any{
-		"status":       status,
-		"published_at": publishedAt,
-		"last_error":   nil,
-		"updated_at":   publishedAt,
-	}).Error; err != nil {
-		return fmt.Errorf("更新 Outbox 发布成功结果: %w", err)
+	result := query.Updates(fields)
+	if result.Error != nil {
+		return false, fmt.Errorf("更新 Outbox 记录失败: %w", result.Error)
 	}
-	return nil
+	return result.RowsAffected == 1, nil
 }
 
 // DeletePublishedBefore 删除指定状态且超过保留期的事件。
